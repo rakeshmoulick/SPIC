@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# SPIC Specific
+archive
+*.txt
+*.npz
+*.png
