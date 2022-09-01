@@ -1,7 +1,10 @@
-# This file plots the continuous evolution of particle data.
-# Plots have been initiated using 'axes'.
-# Only citing the path to the data file is enough to plot,
-# No specific input corresponding to parameteric variation is required
+"""
+This file plots the continuous evolution of particle data.
+Plots have been initiated using 'axes'.
+Only citing the path to the data file is enough to plot,
+No specific input corresponding to parameteric variation is required
+Run as: 
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import os.path

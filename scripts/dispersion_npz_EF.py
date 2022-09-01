@@ -1,6 +1,8 @@
 """
-This file plots the dispersion graph from the npz file processed_results_E.npz
+Plots the dispersion graph of from the electric field data
 Use %reset -f to clear the python workspace
+Data File Invoked: processed_results_all.npz
+Run as: 
 """
 # TO RUN: python3 dispersion_npz.py
 import numpy as np
@@ -12,7 +14,11 @@ from os.path import join as pjoin
 
 file_name = 'processed_results_all.npz'
 path = './'
-
+# ------------------ Comments -------------------------------------------------
+# input parameters specific file
+# path to the data folder is ../data/data002_vd_20/files for vd=20
+# path to the data folder is ../data/data001_vd_80/files for vd=80
+#------------------------------------------------------------------------------
 # Constants
 eps0 = constants('electric constant')
 kb = constants('Boltzmann constant')
@@ -189,7 +195,7 @@ mp.rc('legend', fontsize=10)
 
 fig,ax = plt.subplots(figsize=figsize/25.4,constrained_layout=True,dpi=ppi)
 plt.pcolor(K, Omega, Z,cmap='rainbow',shading='auto',vmin=-3.0,vmax=2.0)
-# Note: Changing vmin & vmax will change the depth of the plots. 
+# Note: Changing vmin & vmax will change the depth of the plots.
 cbar = plt.colorbar()
 cbar.set_label('$\zeta$')
 

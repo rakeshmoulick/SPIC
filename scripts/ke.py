@@ -1,7 +1,9 @@
 """
-The code plots the kinetic energy of the three electron system 
-containing cold, hot and beam electron species. Appropriate files 
-must be chosen using file_name and path.
+Plots the kinetic energy of the total system along with cold, hot and beam electrons.
+Appropriate files must be chosen using 'file_name' and 'path'.
+Use %reset -f to clear the python workspace.
+Data File Invoked: ke_1024.txt
+Run as:
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,9 +14,13 @@ from scipy.constants import value as constants
 
 file_name = 'ke_1024.txt'
 path = './'
-
+# -------------------------- Comments ------------------------------------------
+# input parameters specific file
+# path to the data folder is ../data/data002_vd_20/files/ke_1024.txt for vd=20
+# path to the data folder is ../data/data001_vd_80/files/ke_1024.txt for vd=80
+# vd is an input parameter to run this file and that must be provided along with others.
 #++++++++++++++++++++ UNPACK ++++++++++++++++++++++++++++++++++++++++++++++++++
-if os.path.exists(pjoin(path,file_name)):    
+if os.path.exists(pjoin(path,file_name)):
     t,kei,kec,keh,keb = np.loadtxt(pjoin(path,file_name),unpack=True)
 else:
     print('No data')
@@ -22,9 +28,9 @@ else:
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # -------- NORMALIZE THE INDIVIDUAL KINETIC ENERGIES W.R.T THE CODE------------
 """
-# In the code velocities were normalized while the mass was not normalized. 
-# Further, the kinetic energy was converted into eV unit. Hence, here the data 
-# is deconverted by multiplying by e and divided by me to be a normalized one.  
+# In the code velocities were normalized while the mass was not normalized.
+# Further, the kinetic energy was converted into eV unit. Hence, here the data
+# is deconverted by multiplying by e and divided by me to be a normalized one.
 """
 eps0 = constants('electric constant')
 e = constants('elementary charge')
@@ -41,24 +47,24 @@ LDC = np.sqrt(eps0*Tec/(nec0*e**2)) # Cold electron Debye Length
 # Total thermal energy of all the cold electrons
 vth_ec = wpec*LDC # Thermal velocity of the cold electrons
 nParticlesE = 5000000 # Total number of simulation particles of cold electrons
-electron_cold_spwt = (nec0*1*1024*LDC)/(nParticlesE); # Cold electron specific weight (spwt = density*DX*(domain.xl)*LDC)/(nParticlesE) 
+electron_cold_spwt = (nec0*1*1024*LDC)/(nParticlesE); # Cold electron specific weight (spwt = density*DX*(domain.xl)*LDC)/(nParticlesE)
 # Total Thermal Energy = Thermal Energy of a single real electron
 #                        *Number of real particles represented by a single pseudo electron (or simulation electron)
 #                        *Number Psudo Particles
-Th_ec = Tec*electron_cold_spwt*nParticlesE 
+Th_ec = Tec*electron_cold_spwt*nParticlesE
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#kei = kei*(e/me) 
-#kec = kec*(e/(me)) 
-#keh = keh*(e/(me)) 
-#keb = keb*(e/(me)) 
+#kei = kei*(e/me)
+#kec = kec*(e/(me))
+#keh = keh*(e/(me))
+#keb = keb*(e/(me))
 # By multiplying (vth_ec**2) we unnormalize the normalized velocity in the calculation of KE
-# Then, by multiplying e we de-convert it eV to Joules unit. 
+# Then, by multiplying e we de-convert it eV to Joules unit.
 # Then, divide by the total thermal energy of cold electrons to once again normalize KE, overall.
-# Thus, the KE is now normalized by Total Thermal Energy of cold electrons 
+# Thus, the KE is now normalized by Total Thermal Energy of cold electrons
 kei = kei*((vth_ec)**2)*(e/Th_ec)
-kec = kec*((vth_ec)**2)*(e/Th_ec) 
+kec = kec*((vth_ec)**2)*(e/Th_ec)
 keh = keh*((vth_ec)**2)*(e/Th_ec)
-keb = keb*((vth_ec)**2)*(e/Th_ec) 
+keb = keb*((vth_ec)**2)*(e/Th_ec)
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ke = kec+keh+keb # Total kinetic energy of the electrons
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -75,7 +81,7 @@ mp.rc('ytick', labelsize=10)
 mp.rc('legend', fontsize=10)
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# Plot the figure 
+# Plot the figure
 fig,ax = plt.subplots(2,2,figsize=figsize/25.4,constrained_layout=True,dpi=ppi)
 
 ax[0][0].plot(t,ke,'r',linestyle='-',linewidth=1.0,label='KE')

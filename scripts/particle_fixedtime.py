@@ -1,6 +1,9 @@
+"""
 # This file plots the particle data at fixed times. This is the file to generate plots for the paper.
 # Only citing the path to the data file is enough to plot,
 # No specific input corresponding to parameteric variation is required
+# Run as: 
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import os.path

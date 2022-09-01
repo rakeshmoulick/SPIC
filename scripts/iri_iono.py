@@ -1,12 +1,14 @@
-# -*- coding: utf-8 -*-
 """
-Created on Wed Aug 24 14:53:14 2022
-
-@author: cpp
+Plots the IRI data set
+Use %reset -f to clear the python workspace.
+Data File Invoked: iono_data_Svalbard_2014_Feb1 & iono_data_Svalbard_2020_Feb1
+Run as:
 """
 file_name1 = 'iono_data_Svalbard_2014_Feb1.txt'
 file_name2 = 'iono_data_Svalbard_2020_Feb1.txt'
 path = './'
+# --------------------- Comments --------------------------------------------
+# Path to the data directory is ../iri_dataset/
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import numpy as np
 import os.path
@@ -19,14 +21,14 @@ if os.path.exists(pjoin(path, file_name1)):
 else:
     print('No Data')
     exit()
-    
+
 if os.path.exists(pjoin(path, file_name2)):
     x2,Ne2,Tn2,Ti2,Te2 = np.loadtxt(pjoin(path,file_name2), unpack=True)
 else:
     print('No Data')
     exit()
-    
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 figsize = np.array([200,200/1.618]) #Figure size in mm (FOR SINGLE FIGURE)
 dpi = 1200                        #Print resolution
 ppi = np.sqrt(1920**2+1200**2)/20 #Screen resolution

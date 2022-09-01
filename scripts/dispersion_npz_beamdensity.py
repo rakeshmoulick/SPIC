@@ -1,6 +1,8 @@
 """
-This file plots the dispersion graph from the npz file processed_results_E.npz
-Use %reset -f to clear the python workspace 
+Plots the FFT of the cold density graph of from the cold electron density data.
+Use %reset -f to clear the python workspace.
+Data File Invoked: processed_results_all.npz
+Run as: 
 """
 # TO RUN: python3 dispersion_npz.py
 import numpy as np
@@ -12,7 +14,11 @@ from os.path import join as pjoin
 
 file_name = 'processed_results_all.npz'
 path = './'
-
+# ------------------ Comments -------------------------------------------------
+# input parameters specific file
+# path to the data folder is ../data/beam_data_vd_20/files for vd=20
+# path to the data folder is ../data/beam_data_vd_80/files for vd=80
+#------------------------------------------------------------------------------
 # Constants
 eps0 = constants('electric constant')
 kb = constants('Boltzmann constant')
@@ -64,8 +70,8 @@ DT = DT_coeff*(1.0/wp)
 if os.path.exists(pjoin(path,file_name)):
     data = np.load(pjoin(path,file_name))
     x = data['x']
-    ndeb = data['ndeb']    
-    
+    ndeb = data['ndeb']
+
 else:
     print('No data')
     exit()
@@ -118,7 +124,7 @@ halflen = np.array(Fb.shape, dtype=int)//2
 Omega = Omega[:halflen[0],:halflen[1]]
 K = K[:halflen[0],:halflen[1]]
 Fb = Fb[:halflen[0],:halflen[1]]
-Omega /=wp # Normalized Omega 
+Omega /=wp # Normalized Omega
 K = K*LDC  # Normalized K
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

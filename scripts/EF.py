@@ -1,3 +1,10 @@
+
+"""
+Plots the Electric Field from the electric field data
+Use %reset -f to clear the python workspace
+Data File Invoked:processed_results_E.npz
+Run as: 
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mp
@@ -8,7 +15,11 @@ from os.path import join as pjoin
 
 file_name = 'processed_results_E.npz'
 path = './'
-
+# ------------------ Comments -------------------------------------------------
+# input parameters specific file
+# path to the data folder is ../data/data002_vd_20/files for vd=20
+# path to the data folder is ../data/data001_vd_80/files for vd=80
+#------------------------------------------------------------------------------
 # Constants
 eps0 = constants('electric constant')
 kb = constants('Boltzmann constant')
@@ -86,7 +97,7 @@ EF = EF.reshape(DATA_TS,(NC+1))
 print("The shape of EF is: ", EF.shape)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-wpet_1 = 0 
+wpet_1 = 0
 wpet_2 = 500
 y1 = wpet_1/(DT_coeff*write_interval)
 y2 = wpet_2/(DT_coeff*write_interval)
@@ -96,7 +107,7 @@ print("The shape of E (reduced EF) is: ", E.shape)
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Define the time at which electric field data is required
 wpet = [0, 100, 200, 300, 400]
-# Get the index value corresponding to that time 
+# Get the index value corresponding to that time
 coeff = 1.0/(DT_coeff*write_interval)
 s = [element*coeff for element in wpet]
 

@@ -2,7 +2,7 @@
 """
 This file is to be called for shortening the memory size of the data file results_1024.txt.
 It can compress the file size from around 1 GB to around 150 MB.
-To Run: python3 data_process_npz.py data/foldername/ (folder location)
+Run as: python3 data_process_npz.py data/foldername/ (folder location)
 """
 import numpy as np
 from os.path import join as pjoin
