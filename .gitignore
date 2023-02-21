@@ -36,3 +36,4 @@ archive
 *.txt
 *.npz
 *.png
+data_*
