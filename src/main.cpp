@@ -1,7 +1,13 @@
 /*
- 1D-1V Plasma Code (PBC): PIC-PBC - (Particle-in-Cell with Periodic Boundary Condition) 
+ spic_v2: particle in cell for space plasma 
+ 1D-1V PIC Plasma Code with PBC:
+ This is the second version of the previous spic.   
  This is a Normalized Code with two electron species
-
+ The normalization scheme has been changed in this code. 
+ The spatial lengths are normalized by LD=sqrt(eps0*Tec/(n0*e^2))
+ Tec = cold electron temperature and n0 = Total plasma density.
+ All densities has been normalized by the total electron plasma density
+ and frequencies by wp.
  ****************************************************
  Developer:
  DR. RAKESH MOULICK, CPP-IPR, ASSAM, INDIA
@@ -22,7 +28,7 @@
 extern "C"
 {
 	# include "iniparser.h"
-	
+
 }
 using namespace std;
 
@@ -38,13 +44,13 @@ double rnd()
 }
 
 /* Define universal constants */
-double EPS;      
-double K;           
-double massE;    
-double chargeE; 
+double EPS;
+double K;
+double massE;
+double chargeE;
 double eV;
 double e;
-double AMU; 
+double AMU;
 double massI;
 double EV_TO_K;
 double pi;
@@ -53,6 +59,7 @@ double pi;
 double density;       // Plasma Density
 double stepSize;      // Cell Spacing
 double DT;            // Time steps
+double DT_coeff;
 
 double tempEcold;     // Temperature of the cold electrons in eV units
 double tempEhot;      // Temperature of the hot electrons in eV units
@@ -61,11 +68,11 @@ double tempI;  		  // Temperature of the ion species in eV
 
 
 /*Simulation Normalizing Parameters*/
-double LD;	
-double wp;
-double wpec; // Cold electron Plasma Frequency 
+double n0, nec0, neh0, neb0, ni0;
+double LD, LDH, LDC;
+double wp, wpec, wpeh;
 double CS;
-double vd; // Multiple of electron thermal velocity (for beam drift)
+int vd; // Multiple of electron thermal velocity (for beam drift)
 
 /* CHANGED TYPE FROM CONST TO VAR FOR INPUT DATA CONTROL  */
 int nParticlesE;     // Number of simulation electrons
@@ -157,6 +164,7 @@ Domain domain;
 // Open files to hold numerical data
 FILE *file_res; // File to hold the data of overall data
 FILE *file_ke; 	// File to hold the Kinetic energy data
+FILE *file_pe; // File to hold the Potential energy data
 FILE *f1; 	// File to hold the ion particle data
 FILE *f2; 	// File to hold the cold electron particle data
 FILE *f3; 	// File to hold the hot electron particle data
@@ -175,15 +183,18 @@ void ComputeRho(Species *ions, Species *electrons_cold, Species *electrons_hot, 
 void ComputeEF(double *phi, double *ef);
 void PushSpecies(Species *species, double *ef);
 void RewindSpecies(Species *species, double *ef);
+void SanityCheck(double new_pos, double old_pos, double cell_len);
 
 // [Write Outputs]
 void Write_ts(int ts, Species *ions,Species *electrons_cold, Species *electrons_hot, Species *electrons_beam);
 void Write_Particle(FILE *file, int ts, Species *species);
 void WriteKE(double Time, Species *ions, Species *electrons_cold, Species *electrons_hot, Species *electrons_beam);
+void WritePE(double Time, Species *electrons_cold);
 void WriteLocation(double Time, double pos);
 void WriteDenFluc(FILE *file, double Time, double pos, Species *species);
 
-double ComputeKE(Species *species);
+double ComputeKE(Species *species, Species *electrons_cold);
+double ComputePE(Species *electrons_cold);
 double XtoL(double pos);
 double gather(double lc, double *field);
 
@@ -200,7 +211,7 @@ bool SolvePotentialDirect(double *phi, double *rho);
 // [Ini Parser File]
 int parse_ini_file(char * ini_name)
 {
-    dictionary  *   ini ;
+    dictionary  *   ini;
 
     ini = iniparser_load(ini_name);
     if (ini==NULL) {
@@ -208,7 +219,7 @@ int parse_ini_file(char * ini_name)
         return -1 ;
     }
     //iniparser_dump(ini, stderr); // Comment out to fix issues with iniparser
-	
+
 	/*Universal Constants*/
 	EPS = iniparser_getdouble(ini,"constants:EPS",-1.0);
 	K   = iniparser_getdouble(ini,"constants:K",-1.0);
@@ -216,7 +227,7 @@ int parse_ini_file(char * ini_name)
 	e   = iniparser_getdouble(ini,"constants:e",-1.0);
 	AMU = iniparser_getdouble(ini,"constants:AMU",-1.0);
 	EV_TO_K  = iniparser_getdouble(ini,"constants:EV_TO_K",-1.0);
-	pi  = iniparser_getdouble(ini,"constants:pi",-1.0);    
+	pi  = iniparser_getdouble(ini,"constants:pi",-1.0);
 
     /* SPECIES INFO */
     nParticlesI    = iniparser_getint(ini,"population:nParticlesI",-1);
@@ -224,35 +235,46 @@ int parse_ini_file(char * ini_name)
     massI          = iniparser_getdouble(ini,"population:massI",-1.0);
     massI		   = massI*AMU;
     massE          = iniparser_getdouble(ini,"population:massE",-1.0);
-	
+
     chargeE        = iniparser_getdouble(ini,"population:chargeE",-1.0);
     density        = iniparser_getdouble(ini,"population:density",-1.0);
-    
+
     tempEcold	  = iniparser_getdouble(ini,"population:tempEcold",-1.0);
     tempEhot 	  = iniparser_getdouble(ini,"population:tempEhot",-1.0);
     tempEbeam     = iniparser_getdouble(ini,"population:tempEbeam",-1.0);
     tempI		  = iniparser_getdouble(ini,"population:tempI",-1.0);
     alp 		  = iniparser_getdouble(ini,"population:alp",-1.0);
     beta		  = iniparser_getdouble(ini,"population:beta",-1.0);
-    vd 			  = iniparser_getdouble(ini,"population:vd",-1.0);
+    vd 			  = iniparser_getdouble(ini,"population:vd",-1);
     output		  = iniparser_getstring(ini,"file:output",NULL);
-	
-    /* Normalizing Parameters */    
-    LD = sqrt((EPS*tempEcold*eV)/(density*chargeE*chargeE)); // Debye length of the cold plasma species	
-    wp = sqrt(((1+alp+beta)*density*chargeE*chargeE)/(massE*EPS)); // Total Electron Plasma Frequency 
-    wpec = sqrt((density*chargeE*chargeE)/(massE*EPS)); // Cold electron plasma frequency	
-    CS = sqrt(tempEcold*eV/massI);
-	
-    /*Get Simulation Parameters */
-    NUM_TS         = iniparser_getint(ini,"time:NUM_TS",-1);
-    DT		   = 0.01*(1.0/wp); // This is the unnormalized time interval
-    stepSize 	   = LD;
-    NC             = iniparser_getint(ini,"grid:NC",-1);
-	
-    /* DIAGNOSTICS */    
-    write_interval        = iniparser_getint(ini,"diagnostics:write_interval",-1);    
+
+    /* Normalizing Parameters */
+    n0 = density;
+    nec0 = n0/(1+alp+beta);
+    neh0 = alp*nec0;
+    neb0 = beta*nec0;
+    ni0 = n0; 
+
+    LDC = sqrt((EPS*tempEcold*eV)/(nec0*chargeE*chargeE)); //cold electron Debye length
+    LDH = sqrt((EPS*tempEhot*eV)/(neh0*chargeE*chargeE)); // Hot electron Debye length
+    LD  = sqrt((EPS*tempEcold*eV)/(n0*chargeE*chargeE)); // Characteristic Debye Length (provides smallest spatial resolution)
     
-    //cout << massI << '\t' << massE << endl; 
+    wp = sqrt((n0*chargeE*chargeE)/(massE*EPS)); // Total Electron Plasma Frequency
+    wpec = sqrt((nec0*chargeE*chargeE)/(massE*EPS)); // cold electron plasma frquency
+    wpeh = sqrt((neh0*chargeE*chargeE)/(massE*EPS)); // hot electron plasma frquency
+    CS = sqrt(tempEcold*eV/massI); // Ion acoustic speed
+
+    /*Get Simulation Parameters */
+    DT_coeff = iniparser_getdouble(ini,"diagnostics:DT_coeff",-1.0);
+    NUM_TS     = iniparser_getint(ini,"time:NUM_TS",-1);
+    DT		   = DT_coeff*(1.0/wp); // This is the unnormalized time interval
+    stepSize   = LD;
+    NC         = iniparser_getint(ini,"grid:NC",-1);
+
+    /* DIAGNOSTICS */
+    write_interval = iniparser_getint(ini,"diagnostics:write_interval",-1);
+   	
+    //cout << massI << '\t' << massE << endl;
     cout << "*************** Input Sanity Check ***************" << '\n';
     bool SFLAG = true;
     if (stepSize >= 10) {
@@ -263,7 +285,7 @@ int parse_ini_file(char * ini_name)
       cout<<"ERROR: timeStep is too big. The recommended value: <"<<(0.01/wp)<<" s"<<endl;
       SFLAG = false;
     }
-       
+
     if (SFLAG==true) {
       cout<<"STATUS: Input parameters are compatible."<<endl;
     }
@@ -291,7 +313,7 @@ int main(int argc, char *argv[])
     /********************************************/
     cout << "Debye Length: " << LD << '\t' << "Plasma Frequency: " << wp << '\t' << "Ion Acoustic Speed: " << CS << endl;
     cout << "DX: " << stepSize << '\t' << "DT: " << DT << endl;
-    double Time = 0;	
+    double Time = 0;
     /*Construct the domain paramassEters*/
     domain.ni = NC+1;
     DT = wp*DT; // This is the normalized time interval
@@ -314,17 +336,17 @@ int main(int argc, char *argv[])
     memset(phi,0,sizeof(double)*domain.ni);
     memset(ef, 0,sizeof(double)*domain.ni);
     memset(rho,0,sizeof(double)*domain.ni);
-    
+
     /**************************************************/
 
     /*Species Info: Create vector to hold the data*/
-    vector <Species> species_list; 
-            
+    vector <Species> species_list;
+
     /*Calculate the specific weights of the ions and electrons*/
-    double ion_spwt = ((1+alp+beta)*density*domain.xl*LD)/(nParticlesI);    // Normalized with LD
-    double electron_cold_spwt = (density*domain.xl*LD)/(nParticlesE); // Normalized with LD
-    double electron_hot_spwt = (alp*density*domain.xl*LD)/(nParticlesE); // Normalized with LD
-    double electron_beam_spwt = (beta*density*domain.xl*LD)/(nParticlesE); // Normalized with LD
+    double ion_spwt = (ni0*domain.xl*LD)/(nParticlesI);    // Normalized with LD
+    double electron_cold_spwt = (nec0*domain.xl*LD)/(nParticlesE); // Normalized with LD
+    double electron_hot_spwt = (neh0*domain.xl*LD)/(nParticlesE); // Normalized with LD
+    double electron_beam_spwt = (neb0*domain.xl*LD)/(nParticlesE); // Normalized with LD
 
     /* Add singly charged Positive ions, electrons and Background Neutrals */
     /************************************************************************/
@@ -335,24 +357,24 @@ int main(int argc, char *argv[])
     species_list.emplace_back("Beam Electrons",massE,-chargeE,electron_beam_spwt, nParticlesE, tempEbeam);
 
     /*Assign the species list as ions and electrons*/
-    Species &ions = species_list[0];    
+    Species &ions = species_list[0];
     Species &electrons_cold = species_list[1];
     Species &electrons_hot = species_list[2];
     Species &electrons_beam = species_list[3];
 
     /*Initiate the species density and velocity fields*/
-    ions.den = new double[domain.ni];    
+    ions.den = new double[domain.ni];
     electrons_cold.den = new double[domain.ni];
-    electrons_hot.den = new double[domain.ni];    
+    electrons_hot.den = new double[domain.ni];
     electrons_beam.den = new double[domain.ni];
-	
-    ions.vel = new double[domain.ni];    
+
+    ions.vel = new double[domain.ni];
     electrons_cold.vel = new double[domain.ni];
     electrons_hot.vel = new double[domain.ni];
     electrons_beam.vel = new double[domain.ni];
 
     /*Initialize electrons and ions */
-    Init(&ions,"ion");    
+    Init(&ions,"ion");
     Init(&electrons_cold,"cold");
     Init(&electrons_hot,"hot");
     Init(&electrons_beam,"beam");
@@ -362,7 +384,7 @@ int main(int argc, char *argv[])
     /***************************************************************************/
 
     /*Compute Number Density*/
-    ScatterSpecies(&ions);    
+    ScatterSpecies(&ions);
     ScatterSpecies(&electrons_cold);
     ScatterSpecies(&electrons_hot);
     ScatterSpecies(&electrons_beam);
@@ -374,123 +396,126 @@ int main(int argc, char *argv[])
     SolvePotential(phi, rho);
     ComputeEF(phi,ef);
 
-    RewindSpecies(&ions,ef);    
+    RewindSpecies(&ions,ef);
     RewindSpecies(&electrons_cold,ef);
     RewindSpecies(&electrons_hot,ef);
     RewindSpecies(&electrons_beam,ef);
 
     /*------------- Print Output ---------------*/
 
-    /*create a folder named output and    
-	delete the previous output folder: print statemassEnt is just to show*/
+    /*create a folder named output and
+	delete the previous output folder: print statement is just to show*/
     printf("Deleting the output folder ... \n");
-    system(("rm -rf "+ output).c_str());    
-    
+    system(("rm -rf "+ output).c_str());
+
     /*create an output folder*/
-    //system("mkdir output");        
+    //system("mkdir output");
     system(("mkdir "+ output).c_str());
     system(("mkdir "+ output + "/files").c_str());
-	
+
     char NAME[50];
-	
-    sprintf(NAME,"%s/files/results_%d.txt",output.c_str(),NC);
-    file_res = fopen(NAME,"w");
-	
-    sprintf(NAME,"%s/files/ke_%d.txt",output.c_str(),NC);
-    file_ke = fopen(NAME,"w");
-	
-    sprintf(NAME,"%s/files/potloc_%d.txt",output.c_str(),NC);
+
+    sprintf(NAME,"%s/files/results_%d.txt",output.c_str(),vd);
+    //file_res = fopen(NAME,"w");
+
+    sprintf(NAME,"%s/files/ke_%d.txt",output.c_str(),vd);
+    //file_ke = fopen(NAME,"w");
+    
+    sprintf(NAME,"%s/files/pe_%d.txt",output.c_str(),vd);
+    //file_pe = fopen(NAME,"w");
+
+    sprintf(NAME,"%s/files/potloc_%d.txt",output.c_str(),vd);
     //file_loc = fopen(NAME,"w");
-	
-    sprintf(NAME,"%s/files/denlocI_%d.txt",output.c_str(),NC);
+
+    sprintf(NAME,"%s/files/denlocI_%d.txt",output.c_str(),vd);
     //file_denflucI = fopen(NAME,"w");
 	
-    sprintf(NAME,"%s/files/denlocEC_%d.txt",output.c_str(),NC);
+    sprintf(NAME,"%s/files/denlocEC_%d.txt",output.c_str(),vd);
     //file_denflucEC = fopen(NAME,"w");
-	
-    sprintf(NAME,"%s/files/denlocEH_%d.txt",output.c_str(),NC);
+
+    sprintf(NAME,"%s/files/denlocEH_%d.txt",output.c_str(),vd);
     //file_denflucEH = fopen(NAME,"w");
-				
+
     /*MAIN LOOP*/
     clock_t start = clock();
     for (int ts=0; ts<NUM_TS+1; ts++)
-    {	
+    {
         //Compute number density
-        ScatterSpecies(&ions);        
+        ScatterSpecies(&ions);
         ScatterSpecies(&electrons_cold);
- 	ScatterSpecies(&electrons_hot);
-	ScatterSpecies(&electrons_beam);
+ 	    ScatterSpecies(&electrons_hot);
+	    ScatterSpecies(&electrons_beam);
 
         //Compute velocities
-        ScatterSpeciesVel(&ions);        
+        ScatterSpeciesVel(&ions);
         ScatterSpeciesVel(&electrons_cold);
-	ScatterSpeciesVel(&electrons_hot);
-	ScatterSpeciesVel(&electrons_beam);
+	    ScatterSpeciesVel(&electrons_hot);
+	    ScatterSpeciesVel(&electrons_beam);
 
         //Compute charge density
         ComputeRho(&ions, &electrons_cold, &electrons_hot, &electrons_beam);
 
         //SolvePotential(phi, rho);
         SolvePotentialDirect(phi, rho);
-        ComputeEF(phi, ef);		
-				        
-	//move particles
-        //PushSpecies(&ions, ef);        
+        ComputeEF(phi, ef);
+
+	    //move particles
+        //PushSpecies(&ions, ef);
         PushSpecies(&electrons_cold, ef);
-	PushSpecies(&electrons_hot, ef);
-	PushSpecies(&electrons_beam, ef);
-				
+	    PushSpecies(&electrons_hot, ef);
+	    PushSpecies(&electrons_beam, ef);
+
         //Write diagnostics
         if(ts%write_interval == 0)
-        {					
+        {
             sprintf(NAME,"%s/i%d.txt",output.c_str(),ts);
-            //f1 = fopen(NAME,"w"); 
-			
+            //f1 = fopen(NAME,"w");
+
             sprintf(NAME,"%s/ec%d.txt",output.c_str(),ts);
-            //f2 = fopen(NAME,"w"); 
+            f2 = fopen(NAME,"w");
 
             sprintf(NAME,"%s/eh%d.txt",output.c_str(),ts);
-            //f3 = fopen(NAME,"w");
-            
+            f3 = fopen(NAME,"w");
+
 	    sprintf(NAME,"%s/eb%d.txt",output.c_str(),ts);
-	    //f4 = fopen(NAME,"w");		
+	    f4 = fopen(NAME,"w");
             //===========================================================================================
             double max_phi = phi[0];
             for(int i=0; i<domain.ni; i++)
                 if (phi[i]>max_phi) max_phi=phi[i];
-			
+
 			double max_vel_ion = ions.vel[0];
 			for(int i=0; i<domain.ni; i++)
 				if(ions.vel[i]>max_vel_ion) max_vel_ion = ions.vel[i];
-			
+
             /*print diagnostics to the screen*/
-	printf("TS: %i \t delta_phi: %.3g \t max_vel_ion:%.3g \t nI:%ld \t nEC:%ld \t nEH:%ld \t nEB:%ld\n",
+	        printf("TS: %i \t delta_phi: %.3g \t max_vel_ion:%.3g \t nI:%ld \t nEC:%ld \t nEH:%ld \t nEB:%ld\n",
 				   ts, max_phi-phi[0], max_vel_ion,ions.part_list.size(),electrons_cold.part_list.size(),electrons_hot.part_list.size(),electrons_beam.part_list.size());
-			
-	/*Write time evolution of plasma profiles and Kinetic energy*/
-    	Write_ts(ts, &ions, &electrons_cold, &electrons_hot,&electrons_beam);
-	WriteKE(Time, &ions, &electrons_cold, &electrons_hot, &electrons_beam);            
-	
-	/*Write Electric Field Data at the Mid Plane*/
-	//WriteLocation(Time,domain.xl/2); 
-			
-	/*Write the Density Fluctuation at the Mid Plane*/
-	//WriteDenFluc(file_denflucI, Time, domain.xl/2, &ions);
-	//WriteDenFluc(file_denflucEC, Time, domain.xl/2, &electrons_cold);
-	//WriteDenFluc(file_denflucEH, Time, domain.xl/2, &electrons_hot);
-			
-	/*Write individual particle data to  the file*/
-    	//Write_Particle(f1,ts, &ions);            
-    	//Write_Particle(f2,ts, &electrons_cold);
-	//Write_Particle(f3,ts, &electrons_hot);
-	//Write_Particle(f4,ts, &electrons_beam);		
-				
+
+	        /*Write time evolution of plasma profiles and Kinetic energy*/
+    	    //Write_ts(ts, &ions, &electrons_cold, &electrons_hot,&electrons_beam);
+	      //  WriteKE(Time, &ions, &electrons_cold, &electrons_hot, &electrons_beam);
+           // WritePE(Time, &electrons_cold);
+            
+	        /*Write Electric Field Data at the Mid Plane*/
+	        //WriteLocation(Time,domain.xl/2);
+
+	        /*Write the Density Fluctuation at the Mid Plane*/
+	        //WriteDenFluc(file_denflucI, Time, domain.xl/2, &ions);
+	        //WriteDenFluc(file_denflucEC, Time, domain.xl/2, &electrons_cold);
+	        //WriteDenFluc(file_denflucEH, Time, domain.xl/2, &electrons_hot);
+
+	        /*Write individual particle data to  the file*/
+    	    	//Write_Particle(f1,ts, &ions);
+    	    	Write_Particle(f2,ts, &electrons_cold);
+	    	Write_Particle(f3,ts, &electrons_hot);
+	    	Write_Particle(f4,ts, &electrons_beam);
     }
-		
+
         Time += DT;
     }
     clock_t end = clock();
-	
+
     /*free up memory*/
     delete phi;
     delete rho;
@@ -509,10 +534,10 @@ void Init(Species *species, string flag)
     for(int p=0; p<species->NUM; p++)
     {
 	double v;
-        double x = domain.x0 + rnd()*(domain.ni-1)*domain.dx;	
+        double x = domain.x0 + rnd()*(domain.ni-1)*domain.dx;
 	if	(flag == "cold")
 	{
-		v = SampleVelCold(species->Temp*EV_TO_K, species->mass);		
+		v = SampleVelCold(species->Temp*EV_TO_K, species->mass);
 	}
         else if (flag == "hot")
 	{
@@ -526,7 +551,7 @@ void Init(Species *species, string flag)
 	{
 		v = SampleVel(species->Temp*EV_TO_K, species->mass);
 	}
-		
+
 	// Add to the particle list
         species->add(Particle(x,v));
     }
@@ -535,31 +560,34 @@ void Init(Species *species, string flag)
 /*Sample Velocity (According to Birdsall)*/
 double SampleVel(double T, double mass)
 {
-    	double v_th = sqrt(2*K*T/mass);    
+    double v_th = sqrt(2*K*T/mass);
 	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);
-	return vt/(wpec*LD);	
+    // Normalize particle velocity by the thermal velocity of cold electrons & return
+	return vt/(wpec*LDC); 
 }
 
 double SampleVelCold(double T, double mass)
 {
 	double v_th = sqrt(2*K*T/mass);
-	/*Cold electrons are given a small drift of the order of their thermal speed*/
-    	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);	
-    	return vt/(wpec*LD);
+    double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);
+    // Normalize particle velocity by the thermal velocity of cold electrons & return
+    return vt/(wpec*LDC);
 }
 
 double SampleVelHot(double T, double mass)
 {
-    	double v_th = sqrt(2*K*T/mass);	
-    	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);
-    	return vt/(wpec*LD);
+    double v_th = sqrt(2*K*T/mass);
+    double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);
+    // Normalize particle velocity by the thermal velocity of cold electrons & return
+    return vt/(wpec*LDC);
 }
 
 double SampleVelBeam(double T, double mass)
 {
 	double v_th = sqrt(2*K*T/mass);
-	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5) + vd*wpec*LD;
-	return vt/(wpec*LD);
+	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5) + vd*wpec*LDC;
+    // Normalize particle velocity by the thermal velocity of cold electrons & return
+	return vt/(wpec*LDC); 
 }
 
 /*Covert the physical coordinate to the logical coordinate*/
@@ -606,16 +634,16 @@ void ScatterSpecies(Species *species)
     }
 
     /*divide by cell volume*/
-	/*Hint: we divide by the cell volume because we have scattered 
-	the spwt to the grid, which is just a number. Again number per 
-	unit volume is density. Hence we further divide the field by the cell volume*/ 
+	/*Hint: we divide by the cell volume because we have scattered
+	the spwt to the grid, which is just a number. Again number per
+	unit volume is density. Hence we further divide the field by the cell volume*/
     for(int i=0; i<domain.ni; i++){
     	field[i] /=(domain.dx*LD);}
-	
+
 	/*Normalize the field value*/
 	for(int i=0; i<domain.ni; i++){
 		field[i] /=density;}
-	
+
     field[0] *=2.0;
     field[domain.ni-1] *= 2.0;
 }
@@ -640,9 +668,9 @@ void ScatterSpeciesVel(Species *species)
 
     /*divide by cell volume*/
     for(int i=0; i<domain.ni; i++){
-        field[i] /=(species->den[i]*density*domain.dx*LD);} 
-	
-			
+        field[i] /=(species->den[i]*density*domain.dx*LD);}
+
+
     field[0] *=2.0;
     field[domain.ni-1] *= 2.0;
 }
@@ -665,14 +693,22 @@ void PushSpecies(Species *species, double *ef)
 
         // gather electric field onto particle position
         double part_ef = gather(lc,ef);
-		  
+
         // advance velocity
 	//double wl = LD*LD*wp*wpec;
-		
+	// Grab the old positions of the particles
+	double old_pos = part.pos;
+
         //part.vel += (1/wl)*chargeE*(qm*tempEcold/chargeE)*part_ef*DT;
-	part.vel += qm*(massE/e)*(wpec/wp)*part_ef*DT; 
+        part.vel += qm*(massE/e)*(wp/wpec)*(LD/LDC)*part_ef*DT;
         // Advance particle position
-        part.pos += (wpec/wp)*part.vel*DT;
+        part.pos += (wpec/wp)*(LDC/LD)*part.vel*DT;
+
+	// Grab the new positions of the particles
+	double new_pos = part.pos;
+
+	// Check whether a particle is crossing one full cell length
+	SanityCheck(new_pos, old_pos, domain.dx);
 
         // Take care of the particle that left the Domain (PBC)
 		if (part.pos < domain.x0)
@@ -687,6 +723,15 @@ void PushSpecies(Species *species, double *ef)
     }
 }
 //*********************************************************
+void SanityCheck(double new_pos, double old_pos, double cell_len)
+{
+	if (abs(new_pos-old_pos) > cell_len)
+	{
+		printf("Alert! Particles are crossing one full cell!\n");
+		//exit(-1);
+	}
+}
+// ********************************************************
 /*Rewind particle velocities by -0.5*DT */
 void RewindSpecies(Species *species, double *ef)
 {
@@ -700,8 +745,8 @@ void RewindSpecies(Species *species, double *ef)
         double part_ef = gather(lc,ef);
         //advance velocity
 		//double wl = LD*LD*wp*wpec;
-        //p.vel -= 0.5*chargeE*(1/wl)*(qm*tempEcold/chargeE)*part_ef*DT; 
-        p.vel -= 0.5*qm*(massE/e)*(wpec/wp)*part_ef*DT;
+        //p.vel -= 0.5*chargeE*(1/wl)*(qm*tempEcold/chargeE)*part_ef*DT;
+        p.vel -= 0.5*qm*(massE/e)*(wp/wpec)*(LD/LDC)*part_ef*DT;
     }
 }
 
@@ -712,7 +757,7 @@ void ComputeRho(Species *ions, Species *electrons_cold, Species *electrons_hot, 
     memset(rho,0,sizeof(double)*domain.ni);
 
     for(int i=0; i<domain.ni; i++)
-        rho[i] = (ions->den[i] - electrons_cold->den[i] - electrons_hot->den[i] - electrons_beam->den[i]);      
+        rho[i] = (ions->den[i] - electrons_cold->den[i] - electrons_hot->den[i] - electrons_beam->den[i]);
 }
 
 /* Potential Solver: 1. Gauss-Seidel 2. Direct-Solver*/
@@ -729,7 +774,7 @@ bool SolvePotential(double *phi, double *rho)
     {
         for(int i=1; i<domain.ni-1; i++)
         {
-            double g = 0.5*(phi[i-1] + phi[i+1] + dx2*rho[i]); 
+            double g = 0.5*(phi[i-1] + phi[i+1] + dx2*rho[i]);
             phi[i]=phi[i] + 1.4*(g-phi[i]);
         }
         // Check for convergence
@@ -738,7 +783,7 @@ bool SolvePotential(double *phi, double *rho)
             double sum = 0;
             for(int i=1; i<domain.ni-1; i++)
             {
-                double R = - rho[i] - (phi[i-1]-2*phi[i]+phi[i+1])/dx2;  
+                double R = - rho[i] - (phi[i-1]-2*phi[i]+phi[i+1])/dx2;
                 sum += R*R;
             }
             L2 = sqrt(sum)/domain.ni;
@@ -815,10 +860,10 @@ void Write_ts(int ts, Species *ions,Species *electrons_cold, Species *electrons_
 {
     for(int i=0; i<domain.ni; i++)
     {
-        fprintf(file_res,"%g \t %g \t %g \t %g \t %g \t %g\n", i*domain.dx, electrons_cold->den[i], 
+        fprintf(file_res,"%g \t %g \t %g \t %g \t %g \t %g\n", i*domain.dx, electrons_cold->den[i],
 		electrons_hot->den[i], electrons_beam->den[i], domain.phi[i], domain.ef[i]);
 
-    }    
+    }
     fflush(file_res);
 }
 
@@ -851,29 +896,58 @@ void Write_Particle(FILE *file, int ts, Species *species)
 
 void WriteKE(double Time, Species *ions, Species *electrons_cold, Species *electrons_hot, Species *electrons_beam)
 {
-    double ke_ions = ComputeKE(ions);    
-    double ke_electrons_cold = ComputeKE(electrons_cold);
-    double ke_electrons_hot = ComputeKE(electrons_hot);
-    double ke_electrons_beam = ComputeKE(electrons_beam);
+    double ke_ions = ComputeKE(ions, electrons_cold);
+    double ke_electrons_cold = ComputeKE(electrons_cold, electrons_cold);
+    double ke_electrons_hot = ComputeKE(electrons_hot, electrons_cold);
+    double ke_electrons_beam = ComputeKE(electrons_beam, electrons_cold);
 
     fprintf(file_ke,"%g \t %g \t %g \t %g \t %g\n",Time, ke_ions, ke_electrons_cold, ke_electrons_hot, ke_electrons_beam);
 
     fflush(file_ke);
 }
-
-double ComputeKE(Species *species)
+void WritePE(double Time, Species *electrons_cold)
+{
+    double pe = ComputePE(electrons_cold);
+    fprintf(file_pe, "%g \t %g\n", Time, pe);
+}
+double ComputeKE(Species *species, Species *electrons_cold)
 {
     double ke = 0;
     for (auto &p:species->part_list)
     {
-        ke += p.vel*p.vel;
+        // un-normalize the velocity by multiplying with the cold thermal velocity
+        ke += (p.vel*p.vel)*(wpec*LDC)*(wpec*LDC);
     }
     /*Multiply 0.5*mass for all particles*/
     ke *= 0.5*(species->spwt*species->mass);
+    
+    // Calculate the total thermal energy of all the cold electrons
+    double Th = (electrons_cold->Temp*eV)*(electrons_cold->spwt)*nParticlesE;
 
-    /*Convert the kinetic energy in eV units*/
-    ke /= chargeE;
-    //Normalize ke by dividing by mass of electron
-    //ke = ke/massE;    
+    // Normalize the kinetic energy by the total thermal energy of cold electrons    
+    ke = ke/Th;
     return ke;
+}
+
+double ComputePE(Species *electrons_cold)
+{
+    double pe;
+    // obtain the sum of electric field over 
+    // the whole domain at a definite time step
+    double ef = 0;
+    for (int i=0; i<domain.ni; i++)
+    {
+        ef += domain.ef[i];
+    }
+    // un-normalize this electric field
+    ef = ef*(massE*wp*wp*LD/e);
+    // calculate the un-normalized electric potential energy
+    pe = 0.5*EPS*(ef*ef);
+    
+    // Calculate the total thermal energy of all the cold electrons
+    double Th = (electrons_cold->Temp*eV)*(electrons_cold->spwt)*nParticlesE;
+    // normalize the potential energy by the total thermal 
+    // energy of the cold electrons
+    pe = pe/Th;
+    return pe;
 }

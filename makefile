@@ -9,7 +9,7 @@ CXX		= g++
 CXXLOCAL = -Ilib/iniparser/src
 LLOCAL = -Ilib/iniparser/src
 
-EXEC	= picpbc
+EXEC	= spic
 
 CXXFLAGS = -g -std=c++11 -Wall $(CXXLOCAL) # Flags for compiling
 LFLAGS	=  -g -std=c++11 -Wall $(LLOCAL)   # Flags for linking
@@ -37,9 +37,9 @@ LIBHEAD = $(patsubst %,$(LDIR)/%,$(LIBHEAD_))
 all: version $(EXEC)
 
 $(EXEC): $(ODIR)/main.o $(OBJ) $(LIBOBJ)
-	@echo "Linking PICPBC"
+	@echo "Linking spic"
 	@$(CXX) $^ -o $@ $(LFLAGS) $(FFLAGS) $(HFLAGS)
-	@echo "PICPBC is built"
+	@echo "spic is built"
 
 $(ODIR)/%.o: $(SDIR)/%.cpp
 	@echo "Compiling $<"
