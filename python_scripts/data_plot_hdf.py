@@ -1,3 +1,6 @@
+# python data_plot_hdf.py path_to_data/data.h5 -ke
+# The script will store the plots in the same directory as the data.
+
 import matplotlib.pyplot as plt
 import matplotlib as mp
 from os.path import splitext

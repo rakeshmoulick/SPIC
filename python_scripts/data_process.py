@@ -1,3 +1,6 @@
+# python data_process.py path_to_data_dir
+# Note: path_to_data_dir should contain either of ke_<>.txt and results_<>.txt or both.
+# The script will store the processed data in the same directory as the data.
 import numpy as np
 import argparse
 import glob
