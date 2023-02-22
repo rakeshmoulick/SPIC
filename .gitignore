@@ -36,4 +36,6 @@ archive
 *.txt
 *.npz
 *.png
-data_*
+data_*_*/
+*.tmp
+*.swp

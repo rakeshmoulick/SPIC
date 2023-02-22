@@ -1,9 +1,9 @@
 /*
- spic_v2: particle in cell for space plasma 
+ spic_v2: particle in cell for space plasma
  1D-1V PIC Plasma Code with PBC:
- This is the second version of the previous spic.   
+ This is the second version of the previous spic.
  This is a Normalized Code with two electron species
- The normalization scheme has been changed in this code. 
+ The normalization scheme has been changed in this code.
  The spatial lengths are normalized by LD=sqrt(eps0*Tec/(n0*e^2))
  Tec = cold electron temperature and n0 = Total plasma density.
  All densities has been normalized by the total electron plasma density
@@ -253,12 +253,12 @@ int parse_ini_file(char * ini_name)
     nec0 = n0/(1+alp+beta);
     neh0 = alp*nec0;
     neb0 = beta*nec0;
-    ni0 = n0; 
+    ni0 = n0;
 
     LDC = sqrt((EPS*tempEcold*eV)/(nec0*chargeE*chargeE)); //cold electron Debye length
     LDH = sqrt((EPS*tempEhot*eV)/(neh0*chargeE*chargeE)); // Hot electron Debye length
     LD  = sqrt((EPS*tempEcold*eV)/(n0*chargeE*chargeE)); // Characteristic Debye Length (provides smallest spatial resolution)
-    
+
     wp = sqrt((n0*chargeE*chargeE)/(massE*EPS)); // Total Electron Plasma Frequency
     wpec = sqrt((nec0*chargeE*chargeE)/(massE*EPS)); // cold electron plasma frquency
     wpeh = sqrt((neh0*chargeE*chargeE)/(massE*EPS)); // hot electron plasma frquency
@@ -273,7 +273,7 @@ int parse_ini_file(char * ini_name)
 
     /* DIAGNOSTICS */
     write_interval = iniparser_getint(ini,"diagnostics:write_interval",-1);
-   	
+
     //cout << massI << '\t' << massE << endl;
     cout << "*************** Input Sanity Check ***************" << '\n';
     bool SFLAG = true;
@@ -420,7 +420,7 @@ int main(int argc, char *argv[])
 
     sprintf(NAME,"%s/files/ke_%d.txt",output.c_str(),vd);
     //file_ke = fopen(NAME,"w");
-    
+
     sprintf(NAME,"%s/files/pe_%d.txt",output.c_str(),vd);
     //file_pe = fopen(NAME,"w");
 
@@ -429,7 +429,7 @@ int main(int argc, char *argv[])
 
     sprintf(NAME,"%s/files/denlocI_%d.txt",output.c_str(),vd);
     //file_denflucI = fopen(NAME,"w");
-	
+
     sprintf(NAME,"%s/files/denlocEC_%d.txt",output.c_str(),vd);
     //file_denflucEC = fopen(NAME,"w");
 
@@ -477,8 +477,8 @@ int main(int argc, char *argv[])
             sprintf(NAME,"%s/eh%d.txt",output.c_str(),ts);
             f3 = fopen(NAME,"w");
 
-	    sprintf(NAME,"%s/eb%d.txt",output.c_str(),ts);
-	    f4 = fopen(NAME,"w");
+            sprintf(NAME,"%s/eb%d.txt",output.c_str(),ts);
+            f4 = fopen(NAME,"w");
             //===========================================================================================
             double max_phi = phi[0];
             for(int i=0; i<domain.ni; i++)
@@ -496,7 +496,7 @@ int main(int argc, char *argv[])
     	    //Write_ts(ts, &ions, &electrons_cold, &electrons_hot,&electrons_beam);
 	      //  WriteKE(Time, &ions, &electrons_cold, &electrons_hot, &electrons_beam);
            // WritePE(Time, &electrons_cold);
-            
+
 	        /*Write Electric Field Data at the Mid Plane*/
 	        //WriteLocation(Time,domain.xl/2);
 
@@ -507,7 +507,7 @@ int main(int argc, char *argv[])
 
 	        /*Write individual particle data to  the file*/
     	    	//Write_Particle(f1,ts, &ions);
-    	    	Write_Particle(f2,ts, &electrons_cold);
+    	    Write_Particle(f2,ts, &electrons_cold);
 	    	Write_Particle(f3,ts, &electrons_hot);
 	    	Write_Particle(f4,ts, &electrons_beam);
     }
@@ -563,7 +563,7 @@ double SampleVel(double T, double mass)
     double v_th = sqrt(2*K*T/mass);
 	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5);
     // Normalize particle velocity by the thermal velocity of cold electrons & return
-	return vt/(wpec*LDC); 
+	return vt/(wpec*LDC);
 }
 
 double SampleVelCold(double T, double mass)
@@ -587,7 +587,7 @@ double SampleVelBeam(double T, double mass)
 	double v_th = sqrt(2*K*T/mass);
 	double vt = v_th*sqrt(2)*(rnd()+rnd()+rnd()-1.5) + vd*wpec*LDC;
     // Normalize particle velocity by the thermal velocity of cold electrons & return
-	return vt/(wpec*LDC); 
+	return vt/(wpec*LDC);
 }
 
 /*Covert the physical coordinate to the logical coordinate*/
@@ -695,17 +695,17 @@ void PushSpecies(Species *species, double *ef)
         double part_ef = gather(lc,ef);
 
         // advance velocity
-	//double wl = LD*LD*wp*wpec;
-	// Grab the old positions of the particles
-	double old_pos = part.pos;
+	    //double wl = LD*LD*wp*wpec;
+	    // Grab the old positions of the particles
+	    double old_pos = part.pos;
 
         //part.vel += (1/wl)*chargeE*(qm*tempEcold/chargeE)*part_ef*DT;
         part.vel += qm*(massE/e)*(wp/wpec)*(LD/LDC)*part_ef*DT;
         // Advance particle position
         part.pos += (wpec/wp)*(LDC/LD)*part.vel*DT;
 
-	// Grab the new positions of the particles
-	double new_pos = part.pos;
+	    // Grab the new positions of the particles
+	    double new_pos = part.pos;
 
 	// Check whether a particle is crossing one full cell length
 	SanityCheck(new_pos, old_pos, domain.dx);
@@ -920,11 +920,11 @@ double ComputeKE(Species *species, Species *electrons_cold)
     }
     /*Multiply 0.5*mass for all particles*/
     ke *= 0.5*(species->spwt*species->mass);
-    
+
     // Calculate the total thermal energy of all the cold electrons
     double Th = (electrons_cold->Temp*eV)*(electrons_cold->spwt)*nParticlesE;
 
-    // Normalize the kinetic energy by the total thermal energy of cold electrons    
+    // Normalize the kinetic energy by the total thermal energy of cold electrons
     ke = ke/Th;
     return ke;
 }
@@ -932,7 +932,7 @@ double ComputeKE(Species *species, Species *electrons_cold)
 double ComputePE(Species *electrons_cold)
 {
     double pe;
-    // obtain the sum of electric field over 
+    // obtain the sum of electric field over
     // the whole domain at a definite time step
     double ef = 0;
     for (int i=0; i<domain.ni; i++)
@@ -943,10 +943,10 @@ double ComputePE(Species *electrons_cold)
     ef = ef*(massE*wp*wp*LD/e);
     // calculate the un-normalized electric potential energy
     pe = 0.5*EPS*(ef*ef);
-    
+
     // Calculate the total thermal energy of all the cold electrons
     double Th = (electrons_cold->Temp*eV)*(electrons_cold->spwt)*nParticlesE;
-    // normalize the potential energy by the total thermal 
+    // normalize the potential energy by the total thermal
     // energy of the cold electrons
     pe = pe/Th;
     return pe;
